@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="220" height="480" viewBox="0 0 220 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+	<!-- Cabeza -->
+	<ellipse cx="110" cy="60" rx="35" ry="40" fill="#ffe0b2" stroke="#222" stroke-width="4" />
+	<!-- Cuello -->
+	<rect x="95" y="100" width="30" height="30" rx="10" fill="#ffe0b2" stroke="#222" stroke-width="4" />
+	<!-- Torso -->
+	<rect x="75" y="130" width="70" height="120" rx="30" fill="#ff7043" stroke="#222" stroke-width="4" />
+	<!-- Hombro izquierdo -->
+	<ellipse cx="65" cy="150" rx="20" ry="15" fill="#ff7043" stroke="#222" stroke-width="4" />
+	<!-- Hombro derecho -->
+	<ellipse cx="155" cy="150" rx="20" ry="15" fill="#ff7043" stroke="#222" stroke-width="4" />
+	<!-- Brazo izquierdo (solo parte superior visible) -->
+	<rect x="40" y="170" width="25" height="60" rx="12" fill="#ff7043" stroke="#222" stroke-width="4" />
+	<!-- Brazo derecho (solo parte superior visible) -->
+	<rect x="155" y="170" width="25" height="60" rx="12" fill="#ff7043" stroke="#222" stroke-width="4" />
+	<!-- Línea de postura correcta -->
+	<line x1="110" y1="30" x2="110" y2="250" stroke="#00c853" stroke-width="6" stroke-dasharray="10,8" />
+	<!-- Ojos -->
+	<ellipse cx="100" cy="60" rx="4" ry="6" fill="#222" />
+	<ellipse cx="120" cy="60" rx="4" ry="6" fill="#222" />
+	<!-- Oreja izquierda -->
+	<ellipse cx="75" cy="60" rx="7" ry="12" fill="#ffe0b2" stroke="#222" stroke-width="2" />
+	<!-- Oreja derecha -->
+	<ellipse cx="145" cy="60" rx="7" ry="12" fill="#ffe0b2" stroke="#222" stroke-width="2" />
+	<!-- Boca -->
+	<path d="M100 80 Q110 90 120 80" stroke="#222" stroke-width="3" fill="none" />
+	<!-- Puntos verdes en los landmarks principales -->
+	<circle cx="110" cy="60" r="7" fill="#00FF00" stroke="#222" stroke-width="2" />
+	<!-- Nariz -->
+	<circle cx="70" cy="150" r="7" fill="#00FF00" stroke="#222" stroke-width="2" />
+	<!-- Hombro izq -->
+	<circle cx="150" cy="150" r="7" fill="#00FF00" stroke="#222" stroke-width="2" />
+	<!-- Hombro der -->
+	<circle cx="90" cy="240" r="7" fill="#00FF00" stroke="#222" stroke-width="2" />
+	<!-- Cadera izq -->
+	<circle cx="130" cy="240" r="7" fill="#00FF00" stroke="#222" stroke-width="2" />
+	<!-- Cadera der -->
+	<!-- Puntos azules en las orejas -->
+	<circle cx="75" cy="60" r="6" fill="#2196f3" stroke="#222" stroke-width="2" />
+	<!-- Oreja izq landmark -->
+	<circle cx="145" cy="60" r="6" fill="#2196f3" stroke="#222" stroke-width="2" />
+	<!-- Oreja der landmark -->
+	<!-- Líneas de distancia entre orejas y hombros -->
+	<line x1="75" y1="60" x2="70" y2="150" stroke="#ffab00" stroke-width="4" marker-end="url(#arrow)" />
+	<line x1="145" y1="60" x2="150" y2="150" stroke="#ffab00" stroke-width="4" marker-end="url(#arrow)" />
+	<!-- Flecha para las líneas -->
+	<defs>
+		<marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto" markerUnits="strokeWidth">
+			<path d="M0,0 L10,5 L0,10 L3,5 z" fill="#ffab00" />
+		</marker>
+	</defs>
+	<!-- Texto de referencia -->
+	<text x="50" y="110" font-size="13" fill="#ffab00" transform="rotate(-70 50 110)">
+		distancia
+	</text>
+	<text x="170" y="110" font-size="13" fill="#ffab00" transform="rotate(70 170 110)">
+		distancia
+	</text>
+	<!-- Texto explicativo -->
+	<text x="110" y="300" text-anchor="middle" font-size="18" fill="#222">
+		Postura correcta
+	</text>
+	<text x="110" y="320" text-anchor="middle" font-size="14" fill="#00c853">
+		Cabeza alineada
+	</text>
+	<text x="110" y="340" text-anchor="middle" font-size="14" fill="#00c853">
+		Hombros relajados
+	</text>
+	<text x="110" y="360" text-anchor="middle" font-size="14" fill="#00c853">
+		Torso recto
+	</text>
+</svg>
