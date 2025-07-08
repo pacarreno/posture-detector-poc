@@ -24,22 +24,31 @@ const postureChecks = [
     key: "shoulders",
     label: "Hombros caídos",
     check: (landmarks) => {
+      // Mejor lógica: compara la línea de hombros con la de caderas para compensar inclinación de cámara
       const leftShoulder = landmarks[11];
       const rightShoulder = landmarks[12];
-      const avgShoulderY = (leftShoulder.y + rightShoulder.y) / 2;
-      // Si caderas están presentes, usar lógica precisa
-      if (landmarks[23] && landmarks[24]) {
-        const leftHip = landmarks[23];
-        const rightHip = landmarks[24];
-        const avgHipY = (leftHip.y + rightHip.y) / 2;
-        const torsoHeight = Math.abs(avgShoulderY - avgHipY);
-        return avgShoulderY > avgHipY - 0.3 * torsoHeight;
-      } else if (landmarks[0]) {
-        // Si solo se ve torso superior
-        // Usar distancia entre hombros y nariz
-        const noseY = landmarks[0].y;
-        // Umbral: hombros no deben estar demasiado cerca de la nariz
-        return avgShoulderY < noseY + 0.08;
+      const leftHip = landmarks[23];
+      const rightHip = landmarks[24];
+      if (leftShoulder && rightShoulder && leftHip && rightHip) {
+        // Vector hombros
+        const dxShoulders = rightShoulder.x - leftShoulder.x;
+        const dyShoulders = rightShoulder.y - leftShoulder.y;
+        // Vector caderas
+        const dxHips = rightHip.x - leftHip.x;
+        const dyHips = rightHip.y - leftHip.y;
+        // Ángulo de hombros y caderas respecto a horizontal
+        const angleShoulders = Math.atan2(dyShoulders, dxShoulders);
+        const angleHips = Math.atan2(dyHips, dxHips);
+        // Diferencia de ángulos (en grados)
+        const angleDiffDeg = Math.abs(
+          ((angleShoulders - angleHips) * 180) / Math.PI
+        );
+        // Si la diferencia angular es mayor a cierto umbral, hay inclinación real de hombros respecto a caderas
+        // Umbral tolerante: 7 grados
+        return angleDiffDeg > 7;
+      } else if (leftShoulder && rightShoulder) {
+        // Fallback: diferencia de altura simple, pero con umbral más alto
+        return Math.abs(leftShoulder.y - rightShoulder.y) > 0.1;
       }
       return false;
     },
@@ -51,10 +60,30 @@ const postureChecks = [
     key: "tilt",
     label: "Inclinación lateral de hombros",
     check: (landmarks) => {
+      // Mejor lógica: compara la línea hombros con la línea caderas y calcula el ángulo
       const leftShoulder = landmarks[11];
       const rightShoulder = landmarks[12];
-      // Si la diferencia de altura entre hombros es significativa
-      return Math.abs(leftShoulder.y - rightShoulder.y) > 0.08;
+      const leftHip = landmarks[23];
+      const rightHip = landmarks[24];
+      if (!leftShoulder || !rightShoulder) return false;
+      // Vector hombros
+      const dxShoulders = (rightShoulder.x - leftShoulder.x) * 640;
+      const dyShoulders = (rightShoulder.y - leftShoulder.y) * 480;
+      // Si hay caderas, usar como referencia para compensar inclinación de cámara
+      if (leftHip && rightHip) {
+        const dxHips = (rightHip.x - leftHip.x) * 640;
+        const dyHips = (rightHip.y - leftHip.y) * 480;
+        // Ángulo de hombros y caderas respecto a horizontal
+        const angleShoulders =
+          Math.atan2(dyShoulders, dxShoulders) * (180 / Math.PI);
+        const angleHips = Math.atan2(dyHips, dxHips) * (180 / Math.PI);
+        // Diferencia de ángulos (compensa inclinación de cámara)
+        const diff = Math.abs(angleShoulders - angleHips);
+        return diff > 6; // umbral en grados, ajustable (6° es tolerante)
+      } else {
+        // Si no hay caderas, usar solo diferencia de altura pero con umbral mayor
+        return Math.abs(dyShoulders) > 0.12 * 480; // 0.12 es más tolerante
+      }
     },
     message: "Evita inclinarte de lado (hombros)",
     guide: "Mantén ambos hombros a la misma altura y el tronco recto.",
