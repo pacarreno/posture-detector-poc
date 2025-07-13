@@ -672,7 +672,7 @@ export default function PosturaDetector() {
       if (detectedRef.current && detectedRef.current.length === 0) {
         setIndicatorValue((v) => v + 1);
       } else {
-        setIndicatorValue((v) => v - 1);
+        setIndicatorValue((v) => v - 3);
       }
       // Actualiza el tiempo transcurrido
       setElapsedSeconds((s) => s + 1);
@@ -801,7 +801,10 @@ export default function PosturaDetector() {
             alignItems: "center",
             justifyContent: "center",
             borderRadius: 16,
-            background: indicatorValue > 0 ? "#00c853" : "#ff5252",
+            background:
+              detectedIssues && detectedIssues.length === 0
+                ? "#00c853"
+                : "#ff5252",
             color: "#fff",
             boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
             transition: "background 0.3s",
@@ -815,7 +818,7 @@ export default function PosturaDetector() {
           {indicatorValue}
         </div>
         <div style={{ fontSize: 18, color: "#222", marginTop: 8 }}>
-          Tiempo transcurrido: {elapsedSeconds} segundos
+          Tiempo transcurrido: {formatTime(elapsedSeconds)}
         </div>
         <div style={{ fontSize: 18, color: "#222", marginTop: 8 }}>
           {indicatorValue > 0
@@ -825,4 +828,14 @@ export default function PosturaDetector() {
       </div>
     </div>
   );
+}
+
+// Formatea segundos a hh:mm:ss
+function formatTime(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
