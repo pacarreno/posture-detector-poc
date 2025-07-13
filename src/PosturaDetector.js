@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import SecondaryCameraView from "./SecondaryCameraView";
-import { drawConnectors, drawLandmarks } from "@mediapipe/drawing_utils";
+import { drawLandmarks } from "@mediapipe/drawing_utils";
 import { Pose } from "@mediapipe/pose";
 import MusculatureOverlay from "./MusculatureOverlay";
 
@@ -120,6 +120,7 @@ const postureChecks = [
 ];
 
 export default function PosturaDetector() {
+  const [detectedIssues, setDetectedIssues] = useState([]);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [devices, setDevices] = useState([]);
@@ -148,15 +149,23 @@ export default function PosturaDetector() {
             prev || (logiCam ? logiCam.deviceId : videoDevices[0].deviceId)
         );
         // Selecciona la primera cámara adicional como secundaria si existe
-        const mainDeviceId = logiCam
-          ? logiCam.deviceId
-          : videoDevices[0].deviceId;
-        const secondary = videoDevices.find(
-          (d) => d.deviceId !== (selectedDeviceId || mainDeviceId)
+        // Si existe una cámara cuyo label comienza con "GENERAL", usarla como secundaria
+        const generalCam = videoDevices.find(
+          (d) => d.label && d.label.startsWith("GENERAL")
         );
-        setSecondaryDeviceId(
-          (prev) => prev || (secondary && secondary.deviceId) || ""
-        );
+        if (generalCam) {
+          setSecondaryDeviceId(generalCam.deviceId);
+        } else {
+          const mainDeviceId = logiCam
+            ? logiCam.deviceId
+            : videoDevices[0].deviceId;
+          const secondary = videoDevices.find(
+            (d) => d.deviceId !== (selectedDeviceId || mainDeviceId)
+          );
+          setSecondaryDeviceId(
+            (prev) => prev || (secondary && secondary.deviceId) || ""
+          );
+        }
       }
     });
     // eslint-disable-next-line
@@ -299,47 +308,7 @@ export default function PosturaDetector() {
     ctx.restore();
   }
 
-  function drawEarShoulderGuides(ctx, landmarks) {
-    // Landmarks: 7 = left ear, 8 = right ear, 11 = left shoulder, 12 = right shoulder
-    if (!landmarks) return;
-    const pairs = [
-      { ear: 7, shoulder: 11 },
-      { ear: 8, shoulder: 12 },
-    ];
-    pairs.forEach(({ ear, shoulder }) => {
-      if (landmarks[ear] && landmarks[shoulder]) {
-        // Convert normalized coordinates to canvas
-        const x1 = landmarks[ear].x * 640;
-        const y1 = landmarks[ear].y * 480;
-        const x2 = landmarks[shoulder].x * 640;
-        const y2 = landmarks[shoulder].y * 480;
-        // Distancia vertical
-        const dist = Math.abs(y2 - y1);
-        // Rango de referencia (ajustable)
-        const minDist = 60; // px (verde)
-        const maxDist = 120; // px (naranja)
-        let color = "#00FF00";
-        if (dist > maxDist) color = "#FF3D00";
-        else if (dist > minDist) color = "#FFAB00";
-        // Dibuja la línea
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 6;
-        ctx.stroke();
-        // Dibuja el área objetivo (verde)
-        ctx.beginPath();
-        ctx.moveTo(x1 - 10, y1 + minDist);
-        ctx.lineTo(x1 + 10, y1 + minDist);
-        ctx.lineTo(x1 + 10, y1 + maxDist);
-        ctx.lineTo(x1 - 10, y1 + maxDist);
-        ctx.closePath();
-        ctx.fillStyle = "rgba(0,255,0,0.15)";
-        ctx.fill();
-      }
-    });
-  }
+  // ...existing code...
 
   function onResults(results) {
     const canvasCtx = canvasRef.current.getContext("2d");
@@ -365,10 +334,18 @@ export default function PosturaDetector() {
           detected.push(check);
         }
       });
-      // Solo guía visual de la mejor posición cervical y expansión torácica
-      // Si hay cuello adelantado, resalta la guía
+      setDetectedIssues(detected);
+
+      // --- DIBUJAR SILUETA DE REFERENCIA (STICKMAN) ---
+      // Solo mostrar si hay errores posturales
+      if (detected.length > 0) {
+        drawReferenceStickman(canvasCtx, results.poseLandmarks);
+      }
+
+      // Guía visual de la mejor posición cervical y expansión torácica
       const neckIssue = detected.find((d) => d.key === "neck");
       drawOptimalNeckGuide(canvasCtx, results.poseLandmarks, !!neckIssue);
+
       // Solo dibujar landmarks de cabeza y hombros
       const headAndShouldersIdx = [0, 7, 8, 11, 12];
       const filteredLandmarks = results.poseLandmarks.filter((_, idx) =>
@@ -378,19 +355,242 @@ export default function PosturaDetector() {
         color: detected.length === 0 ? "#00FF00" : "#FF0000",
         lineWidth: 3,
       });
+      // Dibuja un stickman de referencia (verde semitransparente) alineado a la pose ideal
+      function drawReferenceStickman(ctx, userLandmarks) {
+        if (!userLandmarks) return;
+        // Definir proporciones ideales (centrado y erguido)
+        // Usar la posición media de caderas y hombros del usuario para alinear la silueta
+        const leftShoulder = userLandmarks[11];
+        const rightShoulder = userLandmarks[12];
+        const leftHip = userLandmarks[23];
+        const rightHip = userLandmarks[24];
+        const nose = userLandmarks[0];
+        if (!leftShoulder || !rightShoulder || !leftHip || !rightHip || !nose)
+          return;
+        // Centro de hombros y caderas del usuario
+        const midShoulder = {
+          x: ((leftShoulder.x + rightShoulder.x) / 2) * 640,
+          y: ((leftShoulder.y + rightShoulder.y) / 2) * 480,
+        };
+        const midHip = {
+          x: ((leftHip.x + rightHip.x) / 2) * 640,
+          y: ((leftHip.y + rightHip.y) / 2) * 480,
+        };
+        // Altura ideal: distancia hombros-caderas del usuario
+        const torsoLen = Math.abs(midShoulder.y - midHip.y);
+        // Altura cabeza-mentón
+        const headLen = torsoLen * 0.5;
+        // Coordenadas ideales para stickman (alineado a usuario)
+        const stick = {
+          head: { x: midShoulder.x, y: midShoulder.y - headLen },
+          neck: { x: midShoulder.x, y: midShoulder.y - headLen * 0.3 },
+          leftShoulder: { x: midShoulder.x - 40, y: midShoulder.y },
+          rightShoulder: { x: midShoulder.x + 40, y: midShoulder.y },
+          leftHip: { x: midHip.x - 30, y: midHip.y },
+          rightHip: { x: midHip.x + 30, y: midHip.y },
+          torso: { x: midShoulder.x, y: midHip.y },
+        };
+        ctx.save();
+        ctx.globalAlpha = 0.32;
+        ctx.strokeStyle = "#00e676";
+        ctx.lineWidth = 10;
+        ctx.lineCap = "round";
+        // Cabeza (círculo)
+        ctx.beginPath();
+        ctx.arc(stick.head.x, stick.head.y, 28, 0, 2 * Math.PI);
+        ctx.stroke();
+        // Cuello
+        ctx.beginPath();
+        ctx.moveTo(stick.head.x, stick.head.y + 28);
+        ctx.lineTo(stick.neck.x, stick.neck.y);
+        ctx.stroke();
+        // Hombros
+        ctx.beginPath();
+        ctx.moveTo(stick.leftShoulder.x, stick.leftShoulder.y);
+        ctx.lineTo(stick.rightShoulder.x, stick.rightShoulder.y);
+        ctx.stroke();
+        // Torso
+        ctx.beginPath();
+        ctx.moveTo(stick.neck.x, stick.neck.y);
+        ctx.lineTo(stick.torso.x, stick.torso.y);
+        ctx.stroke();
+        // Caderas
+        ctx.beginPath();
+        ctx.moveTo(stick.leftHip.x, stick.leftHip.y);
+        ctx.lineTo(stick.rightHip.x, stick.rightHip.y);
+        ctx.stroke();
+        // Unir hombros con caderas (costados)
+        ctx.beginPath();
+        ctx.moveTo(stick.leftShoulder.x, stick.leftShoulder.y);
+        ctx.lineTo(stick.leftHip.x, stick.leftHip.y);
+        ctx.moveTo(stick.rightShoulder.x, stick.rightShoulder.y);
+        ctx.lineTo(stick.rightHip.x, stick.rightHip.y);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       if (detected.length > 0) {
         detected.forEach((check, idx) => {
-          canvasCtx.font = "20px Arial";
-          // Si es inclinación lateral del tronco, resalta en naranja
-          canvasCtx.fillStyle = check.key === "trunk-tilt" ? "#ff9900" : "red";
-          canvasCtx.fillText(check.message, 10, 30 + idx * 30);
-          // Mostrar guía textual en el canvas
-          canvasCtx.font = "16px Arial";
-          canvasCtx.fillStyle =
-            check.key === "trunk-tilt" ? "#ff9900" : "#3333ff";
-          canvasCtx.fillText(check.guide, 10, 50 + idx * 30);
+          // --- FEEDBACK VISUAL EN CANVAS ---
+          // Parámetros comunes
+          canvasCtx.save();
+          let color =
+            check.key === "trunk-tilt"
+              ? "#ff9900"
+              : check.key === "neck"
+              ? "#2979ff"
+              : "#FF0000";
+          // Flecha sobre el mentón si debe subir la cabeza
+          if (check.key === "neck") {
+            const nose = results.poseLandmarks[0];
+            if (nose) {
+              // Flecha hacia arriba sobre el mentón
+              const x = nose.x * 640;
+              const y = nose.y * 480;
+              drawArrow(canvasCtx, x, y + 20, x, y - 40, color, 8, true);
+            }
+          }
+          // Flecha sobre hombros si están caídos
+          if (check.key === "shoulders") {
+            const leftShoulder = results.poseLandmarks[11];
+            const rightShoulder = results.poseLandmarks[12];
+            if (leftShoulder && rightShoulder) {
+              // Flechas hacia arriba sobre cada hombro
+              [leftShoulder, rightShoulder].forEach((s) => {
+                const x = s.x * 640;
+                const y = s.y * 480;
+                drawArrow(canvasCtx, x, y + 20, x, y - 40, color, 8, true);
+              });
+            }
+          }
+          // Flecha lateral sobre hombro bajo si hay inclinación
+          if (check.key === "tilt") {
+            const leftShoulder = results.poseLandmarks[11];
+            const rightShoulder = results.poseLandmarks[12];
+            if (leftShoulder && rightShoulder) {
+              const lY = leftShoulder.y;
+              const rY = rightShoulder.y;
+              // Flecha hacia arriba sobre el hombro más bajo
+              let s = lY > rY ? leftShoulder : rightShoulder;
+              const x = s.x * 640;
+              const y = s.y * 480;
+              drawArrow(canvasCtx, x, y + 20, x, y - 40, color, 8, true);
+            }
+          }
+          // Flecha lateral sobre el tronco si hay inclinación
+          if (check.key === "trunk-tilt") {
+            const leftShoulder = results.poseLandmarks[11];
+            const rightShoulder = results.poseLandmarks[12];
+            const leftHip = results.poseLandmarks[23];
+            const rightHip = results.poseLandmarks[24];
+            if (leftShoulder && rightShoulder && leftHip && rightHip) {
+              // Centro de hombros y caderas
+              const midShoulder = {
+                x: ((leftShoulder.x + rightShoulder.x) / 2) * 640,
+                y: ((leftShoulder.y + rightShoulder.y) / 2) * 480,
+              };
+              const midHip = {
+                x: ((leftHip.x + rightHip.x) / 2) * 640,
+                y: ((leftHip.y + rightHip.y) / 2) * 480,
+              };
+              // Flecha azul desde caderas hacia hombros
+              drawArrow(
+                canvasCtx,
+                midHip.x,
+                midHip.y,
+                midShoulder.x,
+                midShoulder.y,
+                color,
+                8,
+                true
+              );
+            }
+          }
+          // Ícono de advertencia (círculo rojo) cerca de la parte afectada
+          let iconX = 30,
+            iconY = 30 + idx * 40;
+          if (check.key === "neck" && results.poseLandmarks[0]) {
+            iconX = results.poseLandmarks[0].x * 640 - 20;
+            iconY = results.poseLandmarks[0].y * 480 - 60;
+          } else if (
+            (check.key === "shoulders" || check.key === "tilt") &&
+            results.poseLandmarks[11] &&
+            results.poseLandmarks[12]
+          ) {
+            iconX =
+              ((results.poseLandmarks[11].x + results.poseLandmarks[12].x) /
+                2) *
+                640 -
+              20;
+            iconY =
+              ((results.poseLandmarks[11].y + results.poseLandmarks[12].y) /
+                2) *
+                480 -
+              60;
+          } else if (
+            check.key === "trunk-tilt" &&
+            results.poseLandmarks[23] &&
+            results.poseLandmarks[24]
+          ) {
+            iconX =
+              ((results.poseLandmarks[23].x + results.poseLandmarks[24].x) /
+                2) *
+                640 -
+              20;
+            iconY =
+              ((results.poseLandmarks[23].y + results.poseLandmarks[24].y) /
+                2) *
+                480 +
+              30;
+          }
+          // Dibuja círculo de advertencia
+          canvasCtx.beginPath();
+          canvasCtx.arc(iconX, iconY, 16, 0, 2 * Math.PI);
+          canvasCtx.fillStyle = color;
+          canvasCtx.globalAlpha = 0.7;
+          canvasCtx.fill();
+          // Dibuja el mensaje textual sobre el ícono
+          canvasCtx.globalAlpha = 1.0;
+          canvasCtx.font = "bold 16px Arial";
+          canvasCtx.fillStyle = "#fff";
+          canvasCtx.textAlign = "center";
+          canvasCtx.fillText("!", iconX, iconY + 6);
+          canvasCtx.restore();
         });
+
+        // --- GUÍA PASO A PASO ---
+        // Orden de prioridad: cuello, cabeza, hombros, tronco
+        const pasos = [];
+        if (detected.find((d) => d.key === "neck")) {
+          pasos.push("1. Sube el mentón.");
+        }
+        if (detected.find((d) => d.key === "tilt")) {
+          pasos.push("2. Endereza la cabeza (alinear hombros).");
+        }
+        if (detected.find((d) => d.key === "shoulders")) {
+          pasos.push("3. Relaja y sube los hombros.");
+        }
+        if (detected.find((d) => d.key === "trunk-tilt")) {
+          pasos.push("4. Alinea el tronco con las caderas.");
+        }
+        if (pasos.length > 0) {
+          // Fondo translúcido para la guía
+          canvasCtx.save();
+          canvasCtx.globalAlpha = 0.85;
+          canvasCtx.fillStyle = "#fff";
+          canvasCtx.fillRect(400, 20, 220, 36 + pasos.length * 28);
+          canvasCtx.globalAlpha = 1.0;
+          canvasCtx.font = "bold 18px Arial";
+          canvasCtx.fillStyle = "#2979ff";
+          canvasCtx.fillText("Guía paso a paso:", 510, 44);
+          canvasCtx.font = "16px Arial";
+          canvasCtx.fillStyle = "#222";
+          pasos.forEach((p, i) => {
+            canvasCtx.fillText(p, 410, 72 + i * 24);
+          });
+          canvasCtx.restore();
+        }
+
         // Actualizar historial y estadísticas
         setHistory((prev) => [
           {
@@ -407,9 +607,78 @@ export default function PosturaDetector() {
           return newStats;
         });
       }
+      // Dibuja una flecha en el canvas de (x1, y1) a (x2, y2) con color y tamaño dados
+      function drawArrow(
+        ctx,
+        x1,
+        y1,
+        x2,
+        y2,
+        color = "#FF0000",
+        width = 6,
+        animated = false
+      ) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.globalAlpha = 0.85;
+        ctx.stroke();
+        // Flecha (cabeza)
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const headlen = 18;
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(
+          x2 - headlen * Math.cos(angle - Math.PI / 7),
+          y2 - headlen * Math.sin(angle - Math.PI / 7)
+        );
+        ctx.lineTo(
+          x2 - headlen * Math.cos(angle + Math.PI / 7),
+          y2 - headlen * Math.sin(angle + Math.PI / 7)
+        );
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(
+          x2 - headlen * Math.cos(angle - Math.PI / 7),
+          y2 - headlen * Math.sin(angle - Math.PI / 7)
+        );
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.95;
+        ctx.fill();
+        ctx.restore();
+      }
     }
     canvasCtx.restore();
   }
+
+  // Estado para el indicador numérico
+  const [indicatorValue, setIndicatorValue] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const handleReset = () => {
+    setIndicatorValue(0);
+    setElapsedSeconds(0);
+  };
+  const detectedRef = useRef(detectedIssues);
+  useEffect(() => {
+    detectedRef.current = detectedIssues;
+  }, [detectedIssues]);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Actualiza el indicador según la postura
+      if (detectedRef.current && detectedRef.current.length === 0) {
+        setIndicatorValue((v) => v + 1);
+      } else {
+        setIndicatorValue((v) => v - 1);
+      }
+      // Actualiza el tiempo transcurrido
+      setElapsedSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div style={{ textAlign: "center" }}>
@@ -486,34 +755,73 @@ export default function PosturaDetector() {
           />
         </div>
       </div>
+
+      {/* Franja de feedback postural */}
+      <div
+        style={{
+          width: 640 * 2 + 24, // suma de ambos canvas y el gap
+          height: 32,
+          margin: "0 auto 16px auto",
+          background:
+            detectedIssues && detectedIssues.length === 0
+              ? "#00c853"
+              : "#ff5252",
+          transition: "background 0.3s",
+          borderRadius: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 20,
+          color: "#fff",
+          fontWeight: 600,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+        }}
+      >
+        {detectedIssues && detectedIssues.length === 0
+          ? "¡Postura correcta!"
+          : "Corrige tu postura"}
+      </div>
       <div
         style={{
           marginTop: 20,
-          textAlign: "left",
+          textAlign: "center",
           maxWidth: 640,
           margin: "20px auto",
         }}
       >
-        <h3>Estadísticas de correcciones</h3>
-        <ul>
-          {postureChecks.map((check) => (
-            <li key={check.key}>
-              {check.label}: {stats[check.label] || 0}
-              <br />
-              <span style={{ color: "#3333ff", fontSize: "0.95em" }}>
-                {check.guide}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <h3>Historial reciente</h3>
-        <ul>
-          {history.map((h, idx) => (
-            <li key={idx}>
-              [{h.time}] {h.issues.join(", ")}
-            </li>
-          ))}
-        </ul>
+        <h3>Indicador de postura</h3>
+        <div
+          style={{
+            margin: "32px auto 12px auto",
+            fontSize: 48,
+            fontWeight: 700,
+            width: 180,
+            height: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 16,
+            background: indicatorValue > 0 ? "#00c853" : "#ff5252",
+            color: "#fff",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+            transition: "background 0.3s",
+            marginBottom: 24,
+            cursor: "pointer",
+            userSelect: "none",
+          }}
+          title="Haz clic para reiniciar el contador"
+          onClick={handleReset}
+        >
+          {indicatorValue}
+        </div>
+        <div style={{ fontSize: 18, color: "#222", marginTop: 8 }}>
+          Tiempo transcurrido: {elapsedSeconds} segundos
+        </div>
+        <div style={{ fontSize: 18, color: "#222", marginTop: 8 }}>
+          {indicatorValue > 0
+            ? "¡Buen trabajo! Mantén la postura."
+            : "Corrige tu postura para mejorar el indicador."}
+        </div>
       </div>
     </div>
   );
