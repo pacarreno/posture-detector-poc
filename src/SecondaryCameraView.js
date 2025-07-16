@@ -77,7 +77,7 @@ export default function SecondaryCameraView({ deviceId, placeholder }) {
     ctx.clearRect(0, 0, 640, 480);
     // Dibuja línea vertical central (referencia)
     ctx.save();
-    ctx.strokeStyle = "#2979ff";
+    ctx.strokeStyle = "#2979ff"; // azul
     ctx.lineWidth = 4;
     ctx.setLineDash([10, 10]);
     ctx.beginPath();
@@ -109,7 +109,7 @@ export default function SecondaryCameraView({ deviceId, placeholder }) {
         const headY = nose.y * 480;
         // Dibuja línea desde cadera hasta cabeza
         ctx.save();
-        ctx.strokeStyle = "#00c853";
+        ctx.strokeStyle = "#2979ff"; // azul
         ctx.lineWidth = 6;
         ctx.beginPath();
         ctx.moveTo(midHip.x, midHip.y);
